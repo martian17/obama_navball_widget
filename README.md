@@ -1,2 +1,2 @@
 # Obama Navball
-link: https://martian17.github.io/obama\_navball\_widget/
+link: https://martian17.github.io/obama_navball_widget/
