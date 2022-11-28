@@ -166,6 +166,91 @@ const urlToImageData = async function(url){
     return ctx.getImageData(0,0,img.width,img.height);
 };
 
+class MultiMap{
+    map = new Map;
+    own = Symbol();
+    set(){
+        let lst = [...arguments];
+        let val = lst.pop();
+        let map = this.map;
+        for(let k of lst){
+            if(!map.has(k))map.set(k,new Map);
+            map = map.get(k);
+        }
+        map.set(this.own,val);//to avoid collision between the same level
+        return val;
+    }
+    get(...lst){
+        let map = this.map;
+        for(let k of lst){
+            if(!map.has(k))return undefined;
+            map = map.get(k);
+        }
+        return map.get(this.own);
+    }
+    has(...lst){
+        let map = this.map;
+        for(let k of lst){
+            if(!map.has(k))return false;
+            map = map.get(k);
+        }
+        return map.has(this.own);
+    }
+    delete(...lst){
+        let map = this.map;
+        let maps = [[null,map]];
+        for(let k of lst){
+            if(!map.has(k))return false;
+            map = map.get(k);
+            maps.push([k,map]);
+        }
+        let ret = map.delete(this.own);
+        for(let i = maps.length-1; i > 0; i--){
+            if(maps[i][1].size === 0){
+                maps[i-1][1].delete(maps[i][0]);
+            }else{
+                break;
+            }
+        }
+    }
+};
+
+let dragEvent = {
+    map:new MultiMap(),
+    table:{
+        mousemove:"touchmove",
+        mousedown:"touchstart",
+        mouseup:"touchend"
+    },
+    on:function(elem,evt,cb){
+        let touch;
+        if(evt === "mousedown" || evt === "mousemove"){
+            touch = (e)=>{
+                //e.touches[0].preventDefault = e.preventDefault.bind(e);
+                cb(e.touches[0]);
+            };
+        }else{
+            touch = cb;
+        }
+        elem.e.addEventListener(evt,cb);
+        elem.e.addEventListener(this.table[evt],touch);
+        this.map.set(elem,evt,cb,touch);
+        return true;
+    },
+    off:function(elem,evt,cb){
+        if(!this.map.has(elem,evt,cb))return false;
+        let touch = this.map.get(elem,evt,cb);
+        elem.e.removeEventListener(evt,cb);
+        elem.e.removeEventListener(this.table[evt],touch);
+        return true;
+    }
+};
+
+
+const addDragEvt = function(elem,evt,cb){
+    
+};
+
 
 class Navball extends ELEM{
     width = 200;
@@ -211,7 +296,8 @@ class Navball extends ELEM{
         
         
         //this.on("mousedown",this.handleMousedown);
-        body.on("mousedown",this.handleMousedown);
+        //body.on("mousedown",this.handleMousedown);
+        dragEvent.on(body,"mousedown",this.handleMousedown);
         this.cube = this.add(new Cube3d);
         this.cube.style("z-index:-1");
         
@@ -227,8 +313,10 @@ class Navball extends ELEM{
     }
     //arrow function method automatically binds to this
     handleMousedown = (e)=>{
-        body.on("mousemove",this.handleMousemove);
-        body.on("mouseup",this.handleMouseup);
+        //body.on("mousemove",this.handleMousemove);
+        //body.on("mouseup",this.handleMouseup);
+        dragEvent.on(body,"mousemove",this.handleMousemove);
+        dragEvent.on(body,"mouseup",this.handleMouseup);
         this.x0 = e.clientX;
         this.y0 = e.clientY;
         this.t0 = Date.now();
@@ -252,8 +340,10 @@ class Navball extends ELEM{
         this.t0 = t;
     }
     handleMouseup = (e)=>{
-        body.off("mousemove",this.handleMousemove);
-        body.off("mouseup",this.handleMouseup);
+        //body.off("mousemove",this.handleMousemove);
+        //body.off("mouseup",this.handleMouseup);
+        dragEvent.off(body,"mousemove",this.handleMousemove);
+        dragEvent.off(body,"mouseup",this.handleMouseup);
         this.down = false;
     }
     onFrame = (dt)=>{//dt in seconds
